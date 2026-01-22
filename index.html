@@ -36,12 +36,68 @@
     .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     @media (max-width: 980px){.twoCol{grid-template-columns:1fr}}
     textarea{width:100%;min-height:120px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.2);color:var(--ink);padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px}
-    .hint{margin-top:10px}
+
+    /* Tooltips */
+    .tipwrap{display:inline-flex;align-items:center;gap:6px}
+    .tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.75);font-size:12px;cursor:help;user-select:none;background:rgba(0,0,0,.16)}
+    .tip:focus{outline:2px solid rgba(255,255,255,.18);outline-offset:2px}
+    .tip[data-tip]::after{
+      content:attr(data-tip);
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:calc(100% + 10px);
+      width:min(330px, 74vw);
+      background:rgba(10,14,30,.96);
+      border:1px solid rgba(255,255,255,.12);
+      padding:10px 10px;
+      border-radius:12px;
+      color:rgba(255,255,255,.88);
+      font-size:12px;
+      line-height:1.35;
+      box-shadow:0 14px 30px rgba(0,0,0,.45);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .12s ease;
+      z-index:50;
+      white-space:pre-wrap;
+    }
+    .tip[data-tip]::before{
+      content:"";
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:calc(100% + 4px);
+      width:10px;height:10px;
+      background:rgba(10,14,30,.96);
+      border-left:1px solid rgba(255,255,255,.12);
+      border-top:1px solid rgba(255,255,255,.12);
+      transform:translateX(-50%) rotate(45deg);
+      opacity:0;
+      transition:opacity .12s ease;
+      z-index:51;
+    }
+    .tip:hover::after,.tip:hover::before,.tip:focus::after,.tip:focus::before{opacity:1}
 
     /* Credibility meter */
-    .meter{height:10px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;border:1px solid rgba(255,255,255,.10)}
+    .meter{height:10px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;border:1px solid rgba(255,255,255,.10);margin-top:8px}
     .meter > span{display:block;height:100%;width:0%;background:linear-gradient(90deg, var(--bad), var(--warn), var(--good));}
-    .kpi .subval{margin-top:6px;font-size:12px;color:var(--muted)}
+
+    /* News card */
+    .news{border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.12);border-radius:12px;padding:10px;margin-top:12px}
+    .newsTop{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .headline{font-weight:750;color:rgba(255,255,255,.92);font-size:13px;line-height:1.25}
+    .deck{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.35}
+
+    .controlsMini{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    select{border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.20);color:var(--ink);padding:6px 8px;font-size:12px}
+    .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+    .toggle input{width:16px;height:16px}
+
+    .hintBox{margin-top:8px;border-top:1px solid rgba(255,255,255,.10);padding-top:8px;color:rgba(255,255,255,.85);font-size:12px;line-height:1.35}
+    .hintBox b{color:rgba(255,255,255,.92)}
+
+    .hint{margin-top:10px}
   </style>
 </head>
 <body>
@@ -63,26 +119,93 @@
             <div class="val"><span id="qtr">1</span> / <span id="qtrMax">12</span></div>
           </div>
           <div class="kpi">
-            <div class="label">Score</div>
+            <div class="label">
+              <span class="tipwrap">Score
+                <span class="tip" tabindex="0" data-tip="Score adds up each quarter.
+Max possible per quarter is 120 points.
+The grade is based on your score divided by the max points you could have earned so far.
+
+If the grade says Oops, Recession, it usually means inflation or unemployment is far from target, or your policy swings are too big."></span>
+              </span>
+            </div>
             <div class="val">
-              <span id="score">0</span> / <span id="scoreMaxSoFar">120</span>
+              <span id="score">0</span> / <span id="scoreMax">120</span>
               <span class="tag" id="scorePct">0%</span>
               <span class="tag" id="grade">—</span>
             </div>
-            <div class="small">Score is compared to the max possible points you could have earned so far.</div>
           </div>
         </div>
 
-        <label>Policy rate (i) <span class="tag" id="iTag">2.50%</span></label>
+        <label>
+          <span class="tipwrap">Policy rate (i)
+            <span class="tip" tabindex="0" data-tip="Interest rate = the big steering wheel.
+
+Raise i to cool demand and reduce inflation (with a lag), but unemployment can rise.
+Lower i to boost demand and jobs (with a lag), but inflation can rise.
+
+Tip: big jumps earn volatility penalties. Steady moves often win."></span>
+          </span>
+          <span class="tag" id="iTag">2.50%</span>
+        </label>
         <input id="iRate" type="range" min="0" max="8" step="0.25" value="2.5" />
 
-        <label>QE / QT (balance sheet impulse) <span class="tag" id="qeTag">0</span></label>
+        <label>
+          <span class="tipwrap">QE / QT (balance sheet impulse)
+            <span class="tip" tabindex="0" data-tip="QE/QT is your secondary lever.
+
+QE (positive) = easier financial conditions, boosts demand a bit.
+QT (negative) = tighter conditions, cools demand a bit.
+
+Use this to fine tune when you do not want huge rate moves."></span>
+          </span>
+          <span class="tag" id="qeTag">0</span>
+        </label>
         <input id="qe" type="range" min="-3" max="3" step="0.25" value="0" />
         <div class="small">Negative = QT (tightening). Positive = QE (easing). It acts like a small additional push on demand.</div>
 
-        <label>Forward guidance <span class="tag" id="fgTag">Neutral</span></label>
+        <label>
+          <span class="tipwrap">Forward guidance
+            <span class="tip" tabindex="0" data-tip="Guidance is what you SAY.
+
+Dovish guidance nudges expected future rates down.
+Hawkish nudges expected future rates up.
+
+But guidance only really moves expectations when credibility is high.
+If you say hawkish and cut rates, credibility falls."></span>
+          </span>
+          <span class="tag" id="fgTag">Neutral</span>
+        </label>
         <input id="fg" type="range" min="-2" max="2" step="1" value="0" />
-        <div class="small">Dovish guidance lowers expected future rates. Hawkish does the opposite. Guidance matters more when credibility is high.</div>
+        <div class="small">Dovish guidance lowers expected future rates. Hawkish does the opposite. This moves expectations right away, more when credibility is high.</div>
+
+        <div class="news" aria-live="polite">
+          <div class="newsTop">
+            <div class="headline" id="headline">Breaking: —</div>
+            <div class="controlsMini">
+              <label class="toggle" title="Choose how explicit the headlines are">
+                Difficulty
+                <select id="difficulty">
+                  <option value="mixed" selected>Mixed</option>
+                  <option value="easy">Easy</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label class="toggle" title="Show a policy hint under the headline">
+                <input id="hintToggle" type="checkbox" />
+                Policy hint
+              </label>
+              <span class="tip" tabindex="0" data-tip="Difficulty controls how obvious the headline is.
+
+Easy: labels the type of shock.
+Hard: more interpretive, like real news.
+Mixed: some obvious, some interpretive.
+
+Policy hint: gives a suggested direction, not a guarantee."></span>
+            </div>
+          </div>
+          <div class="deck" id="newsDeck">—</div>
+          <div class="hintBox" id="policyHint" style="display:none"></div>
+        </div>
 
         <div class="btnbar">
           <button class="primary" id="advance">Advance quarter</button>
@@ -121,11 +244,22 @@
             <div class="val"><span id="ePi">—</span>%</div>
           </div>
           <div class="kpi">
-            <div class="label">Credibility</div>
-            <div class="val"><span id="cred">—</span> / 100</div>
-            <div class="subval">
-              <div class="meter" aria-label="Credibility meter"><span id="credBar"></span></div>
+            <div class="label">
+              <span class="tipwrap">Credibility
+                <span class="tip" tabindex="0" data-tip="Credibility is a 0–100 trust index.
+
+It falls when:
+• You talk hawkish but cut rates (or talk dovish but hike).
+• You swing policy wildly.
+• You keep missing targets badly.
+
+It rises slowly when your words match actions and you stabilize inflation and unemployment.
+
+High credibility makes guidance move expectations more."></span>
+              </span>
             </div>
+            <div class="val"><span id="cred">—</span> / 100</div>
+            <div class="meter"><span id="credBar"></span></div>
           </div>
         </div>
 
@@ -190,6 +324,7 @@
   let history;
   let lastPolicy = { i: 2.5, qe: 0, fg: 0 };
   let rngSeed = Math.floor(Math.random()*1e9);
+  let pendingShock = null;
 
   function rand(){
     rngSeed = (1664525*rngSeed + 1013904223) % 4294967296;
@@ -202,12 +337,13 @@
   }
   function clamp(x,a,b){return Math.min(b,Math.max(a,x));}
 
+  // UI
   const qtrEl = document.getElementById('qtr');
   const qtrMaxEl = document.getElementById('qtrMax');
   const scoreEl = document.getElementById('score');
-  const gradeEl = document.getElementById('grade');
-  const scoreMaxSoFarEl = document.getElementById('scoreMaxSoFar');
+  const scoreMaxEl = document.getElementById('scoreMax');
   const scorePctEl = document.getElementById('scorePct');
+  const gradeEl = document.getElementById('grade');
 
   const iEl = document.getElementById('iRate');
   const qeEl = document.getElementById('qe');
@@ -220,8 +356,16 @@
   const uEl = document.getElementById('u');
   const yEl = document.getElementById('y');
   const ePiEl = document.getElementById('ePi');
+
   const credEl = document.getElementById('cred');
   const credBarEl = document.getElementById('credBar');
+
+  const headlineEl = document.getElementById('headline');
+  const newsDeckEl = document.getElementById('newsDeck');
+  const policyHintEl = document.getElementById('policyHint');
+
+  const difficultyEl = document.getElementById('difficulty');
+  const hintToggleEl = document.getElementById('hintToggle');
 
   const logEl = document.getElementById('log');
   const summaryEl = document.getElementById('summary');
@@ -249,6 +393,16 @@
     logEl.prepend(p);
   }
 
+  function updateTags(){
+    const i = parseFloat(iEl.value);
+    const qe = parseFloat(qeEl.value);
+    const fg = parseInt(fgEl.value,10);
+
+    iTag.textContent = i.toFixed(2) + '%';
+    qeTag.textContent = qe.toFixed(2);
+    fgTag.textContent = fgLabel(fg);
+  }
+
   function current(){
     const idx = history.pi.length - 1;
     return {
@@ -258,6 +412,7 @@
     };
   }
 
+  // Shocks
   function shockEvent(){
     const r = rand();
     if(r < 0.18) return { name:'Oil price spike', type:'cost', pi:+0.6, y:-0.4 };
@@ -269,62 +424,206 @@
     return { name:'Global growth slowdown', type:'demand', pi:-0.2, y:-0.5 };
   }
 
-  function credibilityDelta(i, qe, fg, prevI){
+  function shockNewsVariants(s){
+    // Each shock has an obvious version and an interpretive version.
+    // Easy mode will always show the obvious one. Hard mode will always show interpretive.
+    // Mixed mode randomly chooses per quarter.
+
+    const variants = {
+      'Oil price spike': {
+        easy: {
+          h:'Energy markets jump as oil prices spike (Cost shock)',
+          d:'Input costs rise. Inflation risk increases even if growth cools.'
+        },
+        hard: {
+          h:'Energy shock ripples through supply chains',
+          d:'Price pressure can show up without a demand boom. Tradeoffs ahead.'
+        }
+      },
+      'Demand boom (consumer spending)': {
+        easy: {
+          h:'Retail sales pop, demand runs hot (Demand shock)',
+          d:'Stronger demand can raise inflation unless policy cools things off.'
+        },
+        hard: {
+          h:'Households splurge and firms struggle to keep up',
+          d:'When the economy overheats, prices tend to follow.'
+        }
+      },
+      'Credit crunch': {
+        easy: {
+          h:'Banks tighten lending, credit crunch forms (Demand shock)',
+          d:'Demand may weaken. Unemployment risk rises. Easier conditions can cushion the hit.'
+        },
+        hard: {
+          h:'Lenders pull back as risk appetite fades',
+          d:'Financial conditions do some tightening for you. Watch jobs and growth.'
+        }
+      },
+      'Productivity jump': {
+        easy: {
+          h:'Productivity surprise boosts output (Supply shock)',
+          d:'Better supply can ease inflation pressure while supporting growth.'
+        },
+        hard: {
+          h:'Firms find ways to do more with less',
+          d:'The economy may expand without the same price pressure.'
+        }
+      },
+      'Housing slowdown': {
+        easy: {
+          h:'Housing starts slide, rates bite (Demand shock)',
+          d:'Interest sensitive sectors weaken. Too much tightening can overshoot.'
+        },
+        hard: {
+          h:'Construction cools and real estate chatter turns cautious',
+          d:'A key engine is slowing. Policy lags can make this tricky.'
+        }
+      },
+      'Wage push': {
+        easy: {
+          h:'Wage growth accelerates, labor costs climb (Cost shock)',
+          d:'Cost pressure can lift inflation even without booming demand.'
+        },
+        hard: {
+          h:'Pay gains surge as firms compete for workers',
+          d:'If costs rise faster than productivity, prices can creep up.'
+        }
+      },
+      'Global growth slowdown': {
+        easy: {
+          h:'Global growth slows, exports soften (Demand shock)',
+          d:'External demand weakens. Downside risks rise, inflation may ease.'
+        },
+        hard: {
+          h:'Overseas weakness drags on domestic momentum',
+          d:'A softer world economy can cool things at home too.'
+        }
+      },
+    };
+
+    return variants[s.name] || {
+      easy:{h:'Breaking: Mixed data (Unclear shock)', d:'Uncertain outlook. Choose policy carefully.'},
+      hard:{h:'Crosscurrents dominate the outlook', d:'Signals are noisy. Prioritize targets and avoid thrashing.'}
+    };
+  }
+
+  function chooseDifficultyVariant(){
+    const mode = difficultyEl.value;
+    if(mode === 'easy') return 'easy';
+    if(mode === 'hard') return 'hard';
+    // Mixed
+    return (rand() < 0.5) ? 'easy' : 'hard';
+  }
+
+  function buildPolicyHint(s, prev){
+    // This is guidance, not a rule. It uses the shock type plus where the economy is vs targets.
+
+    const piGap = prev.pi - TARGET_PI;
+    const uGap = prev.u - NAIRU;
+
+    // Determine which target is currently more off.
+    const priority = (Math.abs(piGap) > Math.abs(uGap)) ? 'inflation' : 'jobs';
+
+    // Base rec: shock type
+    let base = '';
+    if(s.type === 'cost'){
+      base = 'This looks like cost push inflation risk. If inflation is above target, consider modest tightening (higher i, QT, or hawkish guidance). If unemployment is rising fast, go slower and prioritize stability.';
+    }else if(s.type === 'supply'){
+      base = 'This looks like a supply improvement. Inflation pressure may ease. If unemployment is high, you might not need to tighten. Small moves and steady messaging can work.';
+    }else{
+      // demand
+      if(s.y >= 0){
+        base = 'This looks demand driven and could run hot. Consider leaning tighter (higher i, QT, or hawkish guidance) to prevent overheating.';
+      }else{
+        base = 'This looks like demand weakness. Consider leaning easier (lower i, QE, or dovish guidance) to support jobs and output.';
+      }
+    }
+
+    // Add a "check yourself" line based on gaps
+    let check = '';
+    if(priority === 'inflation'){
+      if(piGap > 0.3) check = 'Right now inflation is above target. Be careful about easing too much.';
+      else if(piGap < -0.3) check = 'Right now inflation is below target. Tightening may not be necessary.';
+      else check = 'Inflation is near target. Avoid huge swings unless unemployment is way off.';
+    }else{
+      if(uGap > 0.4) check = 'Unemployment is above NAIRU. Over tightening could worsen jobs.';
+      else if(uGap < -0.4) check = 'Unemployment is below NAIRU. Demand might be strong, inflation risks could build.';
+      else check = 'Unemployment is near NAIRU. Smooth policy can reduce volatility penalties.';
+    }
+
+    // Credibility note
+    const credNote = (prev.cred < 40)
+      ? 'Credibility is low. If you use guidance, match it with your rate move or it will not stick.'
+      : (prev.cred > 75)
+        ? 'Credibility is high. Guidance will move expectations more, use it carefully.'
+        : 'Credibility is moderate. Try to keep words and actions aligned.';
+
+    return `<b>Policy hint:</b> ${base}<br/><b>Check:</b> ${check}<br/><b>Credibility:</b> ${credNote}`;
+  }
+
+  function setNewsForQuarter(){
+    if(!pendingShock) pendingShock = shockEvent();
+
+    const prev = current();
+    const variant = chooseDifficultyVariant();
+    const v = shockNewsVariants(pendingShock)[variant];
+
+    headlineEl.textContent = `Breaking (Q${Math.min(t,QMAX)}): ${v.h}`;
+    newsDeckEl.textContent = v.d;
+
+    if(hintToggleEl.checked){
+      policyHintEl.style.display = 'block';
+      policyHintEl.innerHTML = buildPolicyHint(pendingShock, prev);
+    }else{
+      policyHintEl.style.display = 'none';
+      policyHintEl.innerHTML = '';
+    }
+  }
+
+  // Credibility
+  function credibilityDelta(i, qe, fg, prevI, prevQE, prev){
     const di = i - prevI;
-    const said = fg;      // -2 dovish ... +2 hawkish
-    const did = di;       // negative = easing, positive = tightening
+    const dqe = qe - prevQE;
 
     let mismatch = 0;
+    if (fg >= 1 && di < -0.10) mismatch += 10;
+    if (fg <= -1 && di > 0.10) mismatch += 10;
 
-    // Big "say/do" contradictions
-    if (said >= 1 && did < -0.10) mismatch += 10;
-    if (said <= -1 && did > 0.10) mismatch += 10;
+    mismatch += Math.max(0, (Math.abs(di)*8 - 2));
+    mismatch += Math.max(0, (Math.abs(dqe)*3 - 1));
 
-    // Larger moves make contradictions louder
-    mismatch += Math.max(0, Math.abs(did)*8 - 2);
-
-    // QE/QT contradictions (smaller weight)
-    if (said >= 1 && qe > 0.5) mismatch += 4;
-    if (said <= -1 && qe < -0.5) mismatch += 4;
+    mismatch += Math.max(0, (Math.abs(prev.pi - TARGET_PI) - 0.6) * 2.0);
+    mismatch += Math.max(0, (Math.abs(prev.u - NAIRU) - 0.8) * 1.4);
 
     let bonus = 0;
-    if (said >= 1 && did > 0.10) bonus += 4;
-    if (said <= -1 && did < -0.10) bonus += 4;
+    if (fg >= 1 && di > 0.10) bonus += 4;
+    if (fg <= -1 && di < -0.10) bonus += 4;
+    if (Math.abs(di) <= 0.25 && Math.abs(dqe) <= 0.25) bonus += 1.5;
 
     return clamp(bonus - mismatch, -18, +10);
   }
 
+  // Grade
   function gradeFromScore(totalScore){
     const quartersCompleted = Math.min(QMAX, Math.max(1, history.pi.length - 1));
     const maxSoFar = quartersCompleted * 120;
     const pct = (totalScore / maxSoFar) * 100;
-
     if(pct >= 78) return {g:'Fed Whisperer', c:'var(--good)'};
     if(pct >= 65) return {g:'Solid Hawk/Dove', c:'var(--good)'};
     if(pct >= 52) return {g:'Mixed Signals', c:'var(--warn)'};
     return {g:'Oops, Recession', c:'var(--bad)'};
   }
 
-  function updateTags(){
-    const i = parseFloat(iEl.value);
-    const qe = parseFloat(qeEl.value);
-    const fg = parseInt(fgEl.value,10);
-
-    iTag.textContent = i.toFixed(2) + '%';
-    qeTag.textContent = qe.toFixed(2);
-    fgTag.textContent = fgLabel(fg);
-  }
-
   function updateDashboard(){
     const cur = current();
-
     qtrEl.textContent = Math.min(t, QMAX);
-    scoreEl.textContent = score.toFixed(0);
 
     const quartersCompleted = Math.min(QMAX, Math.max(1, history.pi.length - 1));
     const maxSoFar = quartersCompleted * 120;
 
-    scoreMaxSoFarEl.textContent = maxSoFar.toFixed(0);
+    scoreEl.textContent = score.toFixed(0);
+    scoreMaxEl.textContent = maxSoFar.toFixed(0);
     scorePctEl.textContent = ((score / maxSoFar) * 100).toFixed(0) + '%';
 
     const gr = gradeFromScore(score);
@@ -344,7 +643,7 @@
   function updateButtons(){
     advanceBtn.disabled = (t > QMAX);
     if(t > QMAX){
-      pushLog(`<b>Run complete.</b> Final score: ${score.toFixed(0)}. Try resetting and see if you can do better with smaller, steadier moves.`);
+      pushLog(`<b>Run complete.</b> Final score: ${score.toFixed(0)} (${gradeFromScore(score).g}). Reset and try smaller moves, and keep message and action consistent.`);
     }
   }
 
@@ -358,7 +657,7 @@
     lines.push('');
 
     const cur = current();
-    lines.push(`End-of-run readings: π=${cur.pi.toFixed(2)}%, u=${cur.u.toFixed(2)}%, y=${cur.y.toFixed(2)}%, Eπ=${cur.ePi.toFixed(2)}%, Cred=${cur.cred.toFixed(0)}/100`);
+    lines.push(`End-of-run readings: π=${cur.pi.toFixed(2)}%, u=${cur.u.toFixed(2)}%, y=${cur.y.toFixed(2)}%, Eπ=${cur.ePi.toFixed(2)}%, Credibility=${cur.cred.toFixed(0)}/100`);
     lines.push('');
 
     lines.push('Quarter-by-quarter decisions and shocks:');
@@ -371,13 +670,15 @@
 
     lines.push('');
     lines.push('Reflection prompts (answer in 3–6 sentences):');
-    lines.push('1) Which shock was the hardest to manage, and why?');
-    lines.push('2) Did you prioritize inflation or unemployment, and how can you tell?');
-    lines.push('3) Did your guidance match your actions? Point to one quarter where it did, and one where it did not.');
+    lines.push('1) Which headline mattered most, and what did it signal about inflation vs unemployment tradeoffs?');
+    lines.push('2) Did the policy hint help or mislead you? Use one quarter as evidence.');
+    lines.push('3) Where did your guidance match your rate move, and what happened to credibility?');
 
-    summaryEl.value = lines.join('\n');
+    summaryEl.value = lines.join('
+');
   }
 
+  // Charts
   function drawAxes(ctx, w, h, pad, yMin, yMax, xMax, yLabel){
     ctx.clearRect(0,0,w,h);
     ctx.strokeStyle = 'rgba(255,255,255,.18)';
@@ -438,8 +739,9 @@
 
   function redraw(){
     const n = Math.min(QMAX, history.pi.length-1);
-    const w1=c1.width, h1=c1.height, pad=46;
+    const pad=46;
 
+    const w1=c1.width, h1=c1.height;
     const piMin=-1, piMax=8;
     const mapPi = drawAxes(g1, w1, h1, pad, piMin, piMax, n, 'π (Inflation, %)');
     plotTarget(g1, mapPi, TARGET_PI, 'rgba(255,209,102,.9)', 'Target 2.0');
@@ -470,37 +772,9 @@
     g2.font='12px system-ui';
     g2.fillText('Output gap', w2-140, pad-10);
     g2.fillStyle='rgba(255,209,102,.95)'; g2.fillRect(w2-200, pad-18, 10, 10);
-    g2.fillStyle='rgba(255,255,255,.75)'; g2.fillText('Policy rate', w2-140, pad+10);
+    g2.fillStyle='rgba(255,255,255,.75)';
+    g2.fillText('Policy rate', w2-140, pad+10);
     g2.fillStyle='rgba(135,180,255,.95)'; g2.fillRect(w2-200, pad+2, 10, 10);
-  }
-
-  function reset(){
-    t = 1;
-    score = 0;
-    history = {
-      i: [2.5], qe:[0], fg:[0],
-      y: [0.0],
-      u: [4.6],
-      pi: [2.2],
-      ePi: [2.1],
-      cred: [72],
-      shocks: ['Baseline conditions'],
-      notes: []
-    };
-    lastPolicy = { i: 2.5, qe: 0, fg: 0 };
-
-    iEl.value = 2.5;
-    qeEl.value = 0;
-    fgEl.value = 0;
-
-    qtrMaxEl.textContent = QMAX;
-    logEl.innerHTML = '';
-    updateTags();
-    updateDashboard();
-    redraw();
-    updateSummary();
-    updateButtons();
-    pushLog('Quarter 1 briefing: <b>Baseline</b>. Inflation slightly above target, labor market near NAIRU.');
   }
 
   function step(){
@@ -510,14 +784,15 @@
     const qe = parseFloat(qeEl.value);
     const fg = parseInt(fgEl.value,10);
 
-    const s = shockEvent();
+    const s = pendingShock || shockEvent();
     const prev = current();
 
-    // credibility and expectations
-    const dCred = credibilityDelta(i, qe, fg, lastPolicy.i);
+    // Credibility
+    const dCred = credibilityDelta(i, qe, fg, lastPolicy.i, lastPolicy.qe, prev);
     const cred = clamp(prev.cred + dCred, 0, 100);
     const credFactor = clamp(cred/100, 0.15, 1.0);
 
+    // Expectations
     let ePi = params.expAnchoring*TARGET_PI + params.expAdapt*prev.pi + (params.expGuidance*credFactor)*(-0.10*fg);
     ePi = clamp(ePi, -1, 8);
 
@@ -536,6 +811,7 @@
     let u = params.uPersist*prev.u - params.okun*y + uShock;
     u = clamp(u, 2.5, 12);
 
+    // Score
     const missPi = Math.abs(pi - TARGET_PI);
     const missU = Math.abs(u - NAIRU);
 
@@ -547,29 +823,79 @@
     const points = Math.max(0, 120 - loss*10);
     score += points;
 
+    // Save
     history.i.push(i); history.qe.push(qe); history.fg.push(fg);
     history.y.push(y); history.pi.push(pi); history.u.push(u); history.ePi.push(ePi);
     history.cred.push(cred);
     history.shocks.push(s.name);
 
     lastPolicy = { i, qe, fg };
+
+    // Log the version they saw (using current difficulty setting, but we store shock name anyway)
+    const variant = chooseDifficultyVariant();
+    const v = shockNewsVariants(s)[variant];
+
     t += 1;
 
     pushLog(
-      `Quarter ${t-1} results: Shock = <b>${s.name}</b>. `+
+      `Quarter ${t-1} results: Headline was <b>${v.h}</b> (shock: <b>${s.name}</b>). `+
       `Set i=${i.toFixed(2)}%, QE=${qe.toFixed(2)}, Guidance=${fgLabel(fg)}. `+
       `Now π=${pi.toFixed(2)}%, u=${u.toFixed(2)}%, y=${y.toFixed(2)}%. Credibility=${cred.toFixed(0)}/100. +${points.toFixed(0)} pts.`
     );
+
+    // Prep next
+    pendingShock = (t <= QMAX) ? shockEvent() : null;
 
     updateDashboard();
     redraw();
     updateSummary();
     updateButtons();
+    setNewsForQuarter();
   }
 
+  function reset(){
+    t = 1;
+    score = 0;
+
+    history = {
+      i: [2.5], qe:[0], fg:[0],
+      y: [0.0],
+      u: [4.6],
+      pi: [2.2],
+      ePi: [2.1],
+      cred: [72],
+      shocks: ['Baseline conditions'],
+      notes: []
+    };
+
+    lastPolicy = { i: 2.5, qe: 0, fg: 0 };
+
+    iEl.value = 2.5;
+    qeEl.value = 0;
+    fgEl.value = 0;
+
+    qtrMaxEl.textContent = QMAX;
+    logEl.innerHTML = '';
+
+    pendingShock = shockEvent();
+
+    updateTags();
+    updateDashboard();
+    redraw();
+    updateSummary();
+    updateButtons();
+    setNewsForQuarter();
+
+    pushLog('Quarter 1 briefing: <b>Baseline</b>. Inflation slightly above target, labor market near NAIRU. Read the headline for a clue about the next shock.');
+  }
+
+  // Events
   iEl.addEventListener('input', updateTags);
   qeEl.addEventListener('input', updateTags);
   fgEl.addEventListener('input', updateTags);
+
+  difficultyEl.addEventListener('change', ()=>{ setNewsForQuarter(); });
+  hintToggleEl.addEventListener('change', ()=>{ setNewsForQuarter(); });
 
   advanceBtn.addEventListener('click', step);
   resetBtn.addEventListener('click', reset);
@@ -583,6 +909,7 @@
     }
   });
 
+  // Start
   reset();
 </script>
 </body>
