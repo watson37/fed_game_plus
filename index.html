@@ -36,17 +36,18 @@
     .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     @media (max-width: 980px){.twoCol{grid-template-columns:1fr}}
     textarea{width:100%;min-height:120px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.2);color:var(--ink);padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:12px}
-
-    .meter{height:10px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:8px}
-    .meter .fill{height:100%;width:50%;background:rgba(53,208,127,.95)}
-
     .hint{margin-top:10px}
+
+    /* Credibility meter */
+    .meter{height:10px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;border:1px solid rgba(255,255,255,.10)}
+    .meter > span{display:block;height:100%;width:0%;background:linear-gradient(90deg, var(--bad), var(--warn), var(--good));}
+    .kpi .subval{margin-top:6px;font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
 <header>
   <h1>Fed Game Plus - Monetary Policy Simulator</h1>
-  <p class="sub">You’re the FOMC. Each quarter you set the policy rate, tweak QE or QT, and choose guidance. The economy responds with lags, expectations, and shocks. Try to keep inflation near target and unemployment near NAIRU without whipping the economy around.</p>
+  <p class="sub">You’re the FOMC. Each quarter you set the policy rate, tweak QE/QT, and choose guidance. The economy responds with lags, expectations, and shocks. Try to keep inflation near target and unemployment near NAIRU without whipping the economy around.</p>
 </header>
 
 <div class="wrap">
@@ -63,7 +64,12 @@
           </div>
           <div class="kpi">
             <div class="label">Score</div>
-            <div class="val"><span id="score">0</span> <span class="tag" id="grade">—</span></div>
+            <div class="val">
+              <span id="score">0</span> / <span id="scoreMaxSoFar">120</span>
+              <span class="tag" id="scorePct">0%</span>
+              <span class="tag" id="grade">—</span>
+            </div>
+            <div class="small">Score is compared to the max possible points you could have earned so far.</div>
           </div>
         </div>
 
@@ -76,7 +82,7 @@
 
         <label>Forward guidance <span class="tag" id="fgTag">Neutral</span></label>
         <input id="fg" type="range" min="-2" max="2" step="1" value="0" />
-        <div class="small">Dovish guidance lowers expected future rates. Hawkish does the opposite. This moves expectations right away, but only if credibility is high.</div>
+        <div class="small">Dovish guidance lowers expected future rates. Hawkish does the opposite. Guidance matters more when credibility is high.</div>
 
         <div class="btnbar">
           <button class="primary" id="advance">Advance quarter</button>
@@ -117,7 +123,9 @@
           <div class="kpi">
             <div class="label">Credibility</div>
             <div class="val"><span id="cred">—</span> / 100</div>
-            <div class="meter" aria-label="Credibility meter"><div class="fill" id="credFill"></div></div>
+            <div class="subval">
+              <div class="meter" aria-label="Credibility meter"><span id="credBar"></span></div>
+            </div>
           </div>
         </div>
 
@@ -149,49 +157,36 @@
 </div>
 
 <script>
-  // Fed Game Plus - lightweight macro model
-  // Designed for teaching: lags + expectations + shocks + scoring + credibility.
-
   const TARGET_PI = 2.0;
   const NAIRU = 4.5;
   const QMAX = 12;
 
-  // Model parameters (tweakable)
   const params = {
-    // Natural real rate
     rStar: 0.75,
-
-    // IS curve
     yPersist: 0.72,
     yRateSens: 0.55,
     yQeSens: 0.18,
     yShockSd: 0.55,
 
-    // Phillips curve
     piPersist: 0.55,
     piExpectWeight: 0.35,
     piSlope: 0.22,
     piShockSd: 0.35,
 
-    // Okun
     uPersist: 0.75,
     okun: 0.35,
     uShockSd: 0.12,
 
-    // Expectations
     expAnchoring: 0.70,
     expAdapt: 0.22,
     expGuidance: 0.18,
 
-    // Scoring
     movePenalty: 5.0,
     volPenalty: 2.0,
   };
 
-  // State
   let t = 1;
   let score = 0;
-  let credibility = 100;
   let history;
   let lastPolicy = { i: 2.5, qe: 0, fg: 0 };
   let rngSeed = Math.floor(Math.random()*1e9);
@@ -207,11 +202,12 @@
   }
   function clamp(x,a,b){return Math.min(b,Math.max(a,x));}
 
-  // UI elements
   const qtrEl = document.getElementById('qtr');
   const qtrMaxEl = document.getElementById('qtrMax');
   const scoreEl = document.getElementById('score');
   const gradeEl = document.getElementById('grade');
+  const scoreMaxSoFarEl = document.getElementById('scoreMaxSoFar');
+  const scorePctEl = document.getElementById('scorePct');
 
   const iEl = document.getElementById('iRate');
   const qeEl = document.getElementById('qe');
@@ -224,9 +220,8 @@
   const uEl = document.getElementById('u');
   const yEl = document.getElementById('y');
   const ePiEl = document.getElementById('ePi');
-
   const credEl = document.getElementById('cred');
-  const credFillEl = document.getElementById('credFill');
+  const credBarEl = document.getElementById('credBar');
 
   const logEl = document.getElementById('log');
   const summaryEl = document.getElementById('summary');
@@ -248,17 +243,247 @@
     return 'Very hawkish';
   }
 
+  function pushLog(html){
+    const p = document.createElement('div');
+    p.innerHTML = html;
+    logEl.prepend(p);
+  }
+
+  function current(){
+    const idx = history.pi.length - 1;
+    return {
+      i: history.i[idx], qe: history.qe[idx], fg: history.fg[idx],
+      y: history.y[idx], u: history.u[idx], pi: history.pi[idx], ePi: history.ePi[idx],
+      cred: history.cred[idx]
+    };
+  }
+
+  function shockEvent(){
+    const r = rand();
+    if(r < 0.18) return { name:'Oil price spike', type:'cost', pi:+0.6, y:-0.4 };
+    if(r < 0.34) return { name:'Demand boom (consumer spending)', type:'demand', pi:+0.3, y:+0.7 };
+    if(r < 0.48) return { name:'Credit crunch', type:'demand', pi:-0.2, y:-0.8 };
+    if(r < 0.62) return { name:'Productivity jump', type:'supply', pi:-0.3, y:+0.5 };
+    if(r < 0.74) return { name:'Housing slowdown', type:'demand', pi:-0.1, y:-0.6 };
+    if(r < 0.86) return { name:'Wage push', type:'cost', pi:+0.5, y:-0.2 };
+    return { name:'Global growth slowdown', type:'demand', pi:-0.2, y:-0.5 };
+  }
+
+  function credibilityDelta(i, qe, fg, prevI){
+    const di = i - prevI;
+    const said = fg;      // -2 dovish ... +2 hawkish
+    const did = di;       // negative = easing, positive = tightening
+
+    let mismatch = 0;
+
+    // Big "say/do" contradictions
+    if (said >= 1 && did < -0.10) mismatch += 10;
+    if (said <= -1 && did > 0.10) mismatch += 10;
+
+    // Larger moves make contradictions louder
+    mismatch += Math.max(0, Math.abs(did)*8 - 2);
+
+    // QE/QT contradictions (smaller weight)
+    if (said >= 1 && qe > 0.5) mismatch += 4;
+    if (said <= -1 && qe < -0.5) mismatch += 4;
+
+    let bonus = 0;
+    if (said >= 1 && did > 0.10) bonus += 4;
+    if (said <= -1 && did < -0.10) bonus += 4;
+
+    return clamp(bonus - mismatch, -18, +10);
+  }
+
+  function gradeFromScore(totalScore){
+    const quartersCompleted = Math.min(QMAX, Math.max(1, history.pi.length - 1));
+    const maxSoFar = quartersCompleted * 120;
+    const pct = (totalScore / maxSoFar) * 100;
+
+    if(pct >= 78) return {g:'Fed Whisperer', c:'var(--good)'};
+    if(pct >= 65) return {g:'Solid Hawk/Dove', c:'var(--good)'};
+    if(pct >= 52) return {g:'Mixed Signals', c:'var(--warn)'};
+    return {g:'Oops, Recession', c:'var(--bad)'};
+  }
+
+  function updateTags(){
+    const i = parseFloat(iEl.value);
+    const qe = parseFloat(qeEl.value);
+    const fg = parseInt(fgEl.value,10);
+
+    iTag.textContent = i.toFixed(2) + '%';
+    qeTag.textContent = qe.toFixed(2);
+    fgTag.textContent = fgLabel(fg);
+  }
+
+  function updateDashboard(){
+    const cur = current();
+
+    qtrEl.textContent = Math.min(t, QMAX);
+    scoreEl.textContent = score.toFixed(0);
+
+    const quartersCompleted = Math.min(QMAX, Math.max(1, history.pi.length - 1));
+    const maxSoFar = quartersCompleted * 120;
+
+    scoreMaxSoFarEl.textContent = maxSoFar.toFixed(0);
+    scorePctEl.textContent = ((score / maxSoFar) * 100).toFixed(0) + '%';
+
+    const gr = gradeFromScore(score);
+    gradeEl.textContent = gr.g;
+    gradeEl.style.borderColor = 'rgba(255,255,255,.14)';
+    gradeEl.style.color = gr.c;
+
+    piEl.textContent = cur.pi.toFixed(2);
+    uEl.textContent = cur.u.toFixed(2);
+    yEl.textContent = cur.y.toFixed(2);
+    ePiEl.textContent = cur.ePi.toFixed(2);
+
+    credEl.textContent = cur.cred.toFixed(0);
+    credBarEl.style.width = cur.cred.toFixed(0) + '%';
+  }
+
+  function updateButtons(){
+    advanceBtn.disabled = (t > QMAX);
+    if(t > QMAX){
+      pushLog(`<b>Run complete.</b> Final score: ${score.toFixed(0)}. Try resetting and see if you can do better with smaller, steadier moves.`);
+    }
+  }
+
+  function updateSummary(){
+    const n = history.pi.length - 1;
+    const lines = [];
+    lines.push(`Fed Game Plus - Run Summary`);
+    lines.push(`Quarters played: ${Math.min(n, QMAX)}`);
+    lines.push(`Final score: ${score.toFixed(0)} (${gradeFromScore(score).g})`);
+    lines.push(`Targets: inflation 2.0%, unemployment 4.5%`);
+    lines.push('');
+
+    const cur = current();
+    lines.push(`End-of-run readings: π=${cur.pi.toFixed(2)}%, u=${cur.u.toFixed(2)}%, y=${cur.y.toFixed(2)}%, Eπ=${cur.ePi.toFixed(2)}%, Cred=${cur.cred.toFixed(0)}/100`);
+    lines.push('');
+
+    lines.push('Quarter-by-quarter decisions and shocks:');
+    for(let q=1;q<=Math.min(QMAX,n);q++){
+      lines.push(
+        `Q${q}: Shock=${history.shocks[q]}; i=${history.i[q].toFixed(2)}%; QE=${history.qe[q].toFixed(2)}; FG=${fgLabel(history.fg[q])}; `+
+        `π=${history.pi[q].toFixed(2)}%; u=${history.u[q].toFixed(2)}%; y=${history.y[q].toFixed(2)}%; Cred=${history.cred[q].toFixed(0)}/100`
+      );
+    }
+
+    lines.push('');
+    lines.push('Reflection prompts (answer in 3–6 sentences):');
+    lines.push('1) Which shock was the hardest to manage, and why?');
+    lines.push('2) Did you prioritize inflation or unemployment, and how can you tell?');
+    lines.push('3) Did your guidance match your actions? Point to one quarter where it did, and one where it did not.');
+
+    summaryEl.value = lines.join('\n');
+  }
+
+  function drawAxes(ctx, w, h, pad, yMin, yMax, xMax, yLabel){
+    ctx.clearRect(0,0,w,h);
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pad, pad, w-2*pad, h-2*pad);
+
+    ctx.fillStyle = 'rgba(255,255,255,.72)';
+    ctx.font = '12px system-ui';
+    ctx.fillText(yLabel, pad, pad-8);
+
+    const gridN = 5;
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    for(let i=0;i<=gridN;i++){
+      const y = pad + (h-2*pad)*(i/gridN);
+      ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+      const val = (yMax - (yMax-yMin)*(i/gridN));
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.fillText(val.toFixed(1), 6, y+4);
+    }
+
+    for(let q=1;q<=xMax;q++){
+      const x = pad + (w-2*pad)*((q-1)/(Math.max(1,xMax-1)));
+      ctx.fillStyle = 'rgba(255,255,255,.45)';
+      ctx.fillText('Q'+q, x-10, h-pad+18);
+    }
+
+    return {
+      xFromQ:(q)=> pad + (w-2*pad)*((q-1)/(Math.max(1,xMax-1))),
+      yFromV:(v)=> pad + (h-2*pad)*(1-(v-yMin)/(yMax-yMin))
+    };
+  }
+
+  function plotLine(ctx, map, series, color){
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for(let q=1;q<series.length;q++){
+      const x = map.xFromQ(q);
+      const y = map.yFromV(series[q]);
+      if(q===1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  function plotTarget(ctx, map, target, color, label){
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6,6]);
+    ctx.beginPath();
+    ctx.moveTo(map.xFromQ(1), map.yFromV(target));
+    ctx.lineTo(map.xFromQ(Math.max(1, history.pi.length-1)), map.yFromV(target));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.font = '12px system-ui';
+    ctx.fillText(label, map.xFromQ(1)+6, map.yFromV(target)-6);
+  }
+
+  function redraw(){
+    const n = Math.min(QMAX, history.pi.length-1);
+    const w1=c1.width, h1=c1.height, pad=46;
+
+    const piMin=-1, piMax=8;
+    const mapPi = drawAxes(g1, w1, h1, pad, piMin, piMax, n, 'π (Inflation, %)');
+    plotTarget(g1, mapPi, TARGET_PI, 'rgba(255,209,102,.9)', 'Target 2.0');
+    plotLine(g1, mapPi, history.pi.slice(0,n+1), 'rgba(255,92,122,.95)');
+
+    const uMin=2.5, uMax=10;
+    const mapU = {xFromQ: mapPi.xFromQ, yFromV:(v)=> pad + (h1-2*pad)*(1-(v-uMin)/(uMax-uMin))};
+    plotTarget(g1, mapU, NAIRU, 'rgba(53,208,127,.85)', 'NAIRU 4.5');
+    plotLine(g1, mapU, history.u.slice(0,n+1), 'rgba(53,208,127,.95)');
+
+    g1.fillStyle='rgba(255,255,255,.75)';
+    g1.font='12px system-ui';
+    g1.fillText('Inflation', w1-140, pad-10);
+    g1.fillStyle='rgba(255,92,122,.95)'; g1.fillRect(w1-200, pad-18, 10, 10);
+    g1.fillStyle='rgba(255,255,255,.75)'; g1.fillText('Unemployment', w1-140, pad+10);
+    g1.fillStyle='rgba(53,208,127,.95)'; g1.fillRect(w1-200, pad+2, 10, 10);
+
+    const w2=c2.width, h2=c2.height;
+    const yMin=-6, yMax=6;
+    const mapY = drawAxes(g2, w2, h2, pad, yMin, yMax, n, 'y (Output gap, %)');
+    plotLine(g2, mapY, history.y.slice(0,n+1), 'rgba(255,209,102,.95)');
+
+    const iMin=0, iMax=8;
+    const mapI = {xFromQ: mapY.xFromQ, yFromV:(v)=> pad + (h2-2*pad)*(1-(v-iMin)/(iMax-iMin))};
+    plotLine(g2, mapI, history.i.slice(0,n+1), 'rgba(135,180,255,.95)');
+
+    g2.fillStyle='rgba(255,255,255,.75)';
+    g2.font='12px system-ui';
+    g2.fillText('Output gap', w2-140, pad-10);
+    g2.fillStyle='rgba(255,209,102,.95)'; g2.fillRect(w2-200, pad-18, 10, 10);
+    g2.fillStyle='rgba(255,255,255,.75)'; g2.fillText('Policy rate', w2-140, pad+10);
+    g2.fillStyle='rgba(135,180,255,.95)'; g2.fillRect(w2-200, pad+2, 10, 10);
+  }
+
   function reset(){
     t = 1;
     score = 0;
-    credibility = 100;
     history = {
       i: [2.5], qe:[0], fg:[0],
       y: [0.0],
       u: [4.6],
       pi: [2.2],
       ePi: [2.1],
-      cred: [100],
+      cred: [72],
       shocks: ['Baseline conditions'],
       notes: []
     };
@@ -275,49 +500,12 @@
     redraw();
     updateSummary();
     updateButtons();
-    pushLog('Quarter 1 briefing: <b>Baseline</b>. Inflation slightly above target, labor market near NAIRU. Credibility starts high, do not waste it.');
-  }
-
-  function updateTags(){
-    const i = parseFloat(iEl.value);
-    const qe = parseFloat(qeEl.value);
-    const fg = parseInt(fgEl.value,10);
-
-    iTag.textContent = i.toFixed(2) + '%';
-    qeTag.textContent = qe.toFixed(2);
-    fgTag.textContent = fgLabel(fg);
-  }
-
-  function current(){
-    const idx = history.pi.length - 1;
-    return {
-      i: history.i[idx], qe: history.qe[idx], fg: history.fg[idx],
-      y: history.y[idx], u: history.u[idx], pi: history.pi[idx], ePi: history.ePi[idx],
-      cred: history.cred[idx]
-    };
-  }
-
-  function pushLog(html){
-    const p = document.createElement('div');
-    p.innerHTML = html;
-    logEl.prepend(p);
-  }
-
-  function shockEvent(){
-    const r = rand();
-    if(r < 0.18) return { name:'Oil price spike', type:'cost', pi:+0.6, y:-0.4 };
-    if(r < 0.34) return { name:'Demand boom (consumer spending)', type:'demand', pi:+0.3, y:+0.7 };
-    if(r < 0.48) return { name:'Credit crunch', type:'demand', pi:-0.2, y:-0.8 };
-    if(r < 0.62) return { name:'Productivity jump', type:'supply', pi:-0.3, y:+0.5 };
-    if(r < 0.74) return { name:'Housing slowdown', type:'demand', pi:-0.1, y:-0.6 };
-    if(r < 0.86) return { name:'Wage push', type:'cost', pi:+0.5, y:-0.2 };
-    return { name:'Global growth slowdown', type:'demand', pi:-0.2, y:-0.5 };
+    pushLog('Quarter 1 briefing: <b>Baseline</b>. Inflation slightly above target, labor market near NAIRU.');
   }
 
   function step(){
     if(t > QMAX) return;
 
-    // Read chosen policy
     const i = parseFloat(iEl.value);
     const qe = parseFloat(qeEl.value);
     const fg = parseInt(fgEl.value,10);
@@ -325,19 +513,77 @@
     const s = shockEvent();
     const prev = current();
 
-    // Credibility update (0-100)
-    // Drops with big swings, flip-flops, talk vs action mismatch, and repeated misses.
+    // credibility and expectations
+    const dCred = credibilityDelta(i, qe, fg, lastPolicy.i);
+    const cred = clamp(prev.cred + dCred, 0, 100);
+    const credFactor = clamp(cred/100, 0.15, 1.0);
+
+    let ePi = params.expAnchoring*TARGET_PI + params.expAdapt*prev.pi + (params.expGuidance*credFactor)*(-0.10*fg);
+    ePi = clamp(ePi, -1, 8);
+
+    const rReal = i - ePi;
+    const rGap = rReal - params.rStar;
+
+    const yShock = params.yShockSd*randn() + s.y;
+    let y = params.yPersist*prev.y - params.yRateSens*rGap + params.yQeSens*qe + yShock;
+    y = clamp(y, -6, 6);
+
+    const piShock = params.piShockSd*randn() + s.pi;
+    let pi = params.piPersist*prev.pi + params.piExpectWeight*ePi + params.piSlope*y + piShock;
+    pi = clamp(pi, -1, 10);
+
+    const uShock = params.uShockSd*randn();
+    let u = params.uPersist*prev.u - params.okun*y + uShock;
+    u = clamp(u, 2.5, 12);
+
+    const missPi = Math.abs(pi - TARGET_PI);
+    const missU = Math.abs(u - NAIRU);
+
     const moveI = Math.abs(i - lastPolicy.i);
     const moveQE = Math.abs(qe - lastPolicy.qe);
+    const vol = Math.abs(y - prev.y) + Math.abs(pi - prev.pi);
 
-    const prevI = history.i[history.i.length - 1];
-    const prevPrevI = history.i.length >= 2 ? history.i[history.i.length - 2] : prevI;
-    const lastMove = prevI - prevPrevI;
-    const thisMove = i - lastPolicy.i;
+    const loss = 8*missPi + 6*missU + params.movePenalty*(0.6*moveI + 0.25*moveQE) + params.volPenalty*vol;
+    const points = Math.max(0, 120 - loss*10);
+    score += points;
 
-    const flipFlop = (Math.sign(lastMove) !== 0 && Math.sign(thisMove) !== 0 && Math.sign(lastMove) !== Math.sign(thisMove));
+    history.i.push(i); history.qe.push(qe); history.fg.push(fg);
+    history.y.push(y); history.pi.push(pi); history.u.push(u); history.ePi.push(ePi);
+    history.cred.push(cred);
+    history.shocks.push(s.name);
 
-    // Talk vs action mismatch
-    const talkActionMismatch = (fg >= 1 && thisMove < -0.01) || (fg <= -1 && thisMove > 0.01);
+    lastPolicy = { i, qe, fg };
+    t += 1;
 
-    const missPiPrev = Math.abs
+    pushLog(
+      `Quarter ${t-1} results: Shock = <b>${s.name}</b>. `+
+      `Set i=${i.toFixed(2)}%, QE=${qe.toFixed(2)}, Guidance=${fgLabel(fg)}. `+
+      `Now π=${pi.toFixed(2)}%, u=${u.toFixed(2)}%, y=${y.toFixed(2)}%. Credibility=${cred.toFixed(0)}/100. +${points.toFixed(0)} pts.`
+    );
+
+    updateDashboard();
+    redraw();
+    updateSummary();
+    updateButtons();
+  }
+
+  iEl.addEventListener('input', updateTags);
+  qeEl.addEventListener('input', updateTags);
+  fgEl.addEventListener('input', updateTags);
+
+  advanceBtn.addEventListener('click', step);
+  resetBtn.addEventListener('click', reset);
+
+  copyBtn.addEventListener('click', async ()=>{
+    try{
+      await navigator.clipboard.writeText(summaryEl.value);
+      pushLog('<b>Copied.</b> Summary text is now on your clipboard.');
+    }catch(e){
+      pushLog('Could not auto-copy. You can still select the text and copy manually.');
+    }
+  });
+
+  reset();
+</script>
+</body>
+</html>
