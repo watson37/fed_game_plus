@@ -374,9 +374,12 @@
     updateButtons();
   }
 
-  function gradeFromScore(s){
-    const max = QMAX*120;
-    const pct = (s/max)*100;
+  function gradeFromScore(totalScore){
+    // Grade should evolve during play, not stay stuck at “recession” early on.
+    // So we grade against the max possible points *so far* (quarters completed).
+    const quartersCompleted = Math.min(QMAX, Math.max(1, history.pi.length - 1));
+    const maxSoFar = quartersCompleted * 120;
+    const pct = (totalScore / maxSoFar) * 100;
     if(pct >= 78) return {g:'Fed Whisperer', c:'var(--good)'};
     if(pct >= 65) return {g:'Solid Hawk/Dove', c:'var(--good)'};
     if(pct >= 52) return {g:'Mixed Signals', c:'var(--warn)'};
